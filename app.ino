@@ -56,17 +56,21 @@ void writeToDisplay(const char* line, bool clearAndDisplay = true)
     }
 }
 
-void onKeyUp(uint16_t scancode) {}
+void onKeyUp(const uint16_t (&scancode)[decltype(kbread)::event_buffer_size], size_t scancodes_len) {}
 
-void onKeyDown(uint16_t scancode)
+void onKeyDown(const uint16_t (&scancodes)[decltype(kbread)::event_buffer_size], size_t scancodes_len)
 {
     static char    line_buffer[20] = {0};
     static uint8_t p               = 0;
-    const char     typed           = keymap[scancode - 1];
-    line_buffer[p++]               = typed;
-    if (p == 19)
+    for (size_t i = 0; i < scancodes_len; ++i)
     {
-        p = 0;
+        const uint16_t scancode = scancodes[i];
+        const char     typed    = keymap[scancode - 1];
+        line_buffer[p++]        = typed;
+        if (p == 19)
+        {
+            p = 0;
+        }
     }
     writeToDisplay(line_buffer);
 }

@@ -38,9 +38,7 @@ enum SwitchState : uint8_t
 {
     UNKNOWN              = 0,
     OPEN                 = 1,
-    CLOSED               = 2,
-    OPEN_EVENT_PENDING   = 17,
-    CLOSED_EVENT_PENDING = 34
+    CLOSED               = 2
 };
 
 struct SwitchDef
@@ -51,17 +49,17 @@ struct SwitchDef
 };
 };  // namespace
 
-typedef void (*SwitchHandler)(uint16_t scancode);
-
 /**
  * Raw swtch matrix scanning logic with optional software debounce.
- * 
- * TODO: vector version of callback events.
  */
-template <size_t ROW_COUNT, size_t COL_COUNT>
+template <size_t ROW_COUNT, size_t COL_COUNT, size_t EVENT_BUFFER_SIZE = 10>
 class SwitchMatrixScanner final
 {
 public:
+    typedef void (*SwitchHandler)(const uint16_t (&scancodes)[EVENT_BUFFER_SIZE], size_t scancodes_len);
+
+    static constexpr size_t event_buffer_size = EVENT_BUFFER_SIZE;
+
     SwitchMatrixScanner(const uint8_t (&row_pins)[ROW_COUNT],
                         const uint8_t (&column_pins)[COL_COUNT],
                         const bool enable_pullups           = true,
@@ -73,7 +71,10 @@ public:
         , m_switchhandler_open(nullptr)
         , m_column_input_type((enable_pullups) ? INPUT_PULLUP : INPUT)
         , m_enable_software_debounce(enable_software_debounce)
-        , m_event_high_water_mark{0, 0}
+        , m_scancode_event_buffer_opened{0}
+        , m_scancode_event_buffer_opened_len(0)
+        , m_scancode_event_buffer_closed{0}
+        , m_scancode_event_buffer_closed_len(0)
     {
         memcpy(m_row_pins, row_pins, sizeof(row_pins));
         memcpy(m_col_pins, column_pins, sizeof(column_pins));
@@ -111,7 +112,7 @@ public:
         return true;
     }
 
-    void scan(bool flush_events_in_call = true)
+    void scan()
     {
         for (size_t r = 0; r < ROW_COUNT; ++r)
         {
@@ -130,44 +131,32 @@ public:
                 }
                 else
                 {
-                    swtch.sample_buffer = (is_switch_pressed) ? 0xFFFF : 0x0000;
+                    static_assert(sizeof(swtch.sample_buffer) == 1,
+                                  "Hardcoded logic expects 1-byte sample_buffer. Modify this line if you changed the "
+                                  "sample_buffer type.");
+                    swtch.sample_buffer = (is_switch_pressed) ? 0xFF : 0x00;
                 }
                 if (handleSwitchState(swtch))
                 {
-                    m_event_high_water_mark[0] = r + 1;
-                    m_event_high_water_mark[1] = c + 1;
+                    if (m_scancode_event_buffer_closed_len == EVENT_BUFFER_SIZE)
+                    {
+                        // We're about to overrun our event buffer so we'll have to flush
+                        // before we're done scanning.
+                        flush_closed_events();
+                    }
+                    if (m_scancode_event_buffer_opened_len == EVENT_BUFFER_SIZE)
+                    {
+                        // We're about to overrun our event buffer so we'll have to flush
+                        // before we're done scanning.
+                        flush_opened_events();
+                    }
                 }
             }
             // High-impedence
             pinMode(rowpin, INPUT);
         }
-        if (flush_events_in_call)
-        {
-            flush_events();
-        }
-    }
-
-    void flush_events()
-    {
-        for (size_t r = 0; r < m_event_high_water_mark[0]; ++r)
-        {
-            for (size_t c = 0; c < m_event_high_water_mark[1]; ++c)
-            {
-                SwitchDef& swtch = m_switch_map[r][c];
-                if (swtch.state == SwitchState::OPEN_EVENT_PENDING)
-                {
-                    onSwitchOpen(swtch);
-                    swtch.state = SwitchState::OPEN;
-                }
-                else if (swtch.state == SwitchState::CLOSED_EVENT_PENDING)
-                {
-                    onSwitchClosed(swtch);
-                    swtch.state = SwitchState::CLOSED;
-                }
-            }
-        }
-        m_event_high_water_mark[0] = 0;
-        m_event_high_water_mark[1] = 0;
+        flush_closed_events();
+        flush_opened_events();
     }
 
     bool isSwitchClosed(uint16_t scancode)
@@ -183,7 +172,7 @@ public:
         }
         const uint16_t row = scanindex / COL_COUNT;
         const uint16_t col = scanindex - (row * COL_COUNT);
-        return (static_cast<SwitchState>(m_switch_map[row][col].state & 0xF) == SwitchState::CLOSED);
+        return (m_switch_map[row][col].state == SwitchState::CLOSED);
     }
 
 private:
@@ -217,13 +206,33 @@ private:
     // +----------------------------------------------------------------------+
     static constexpr const size_t ScanCodeMax = 0xFFFF;
 
-    static_assert(ROW_COUNT * COL_COUNT < ScanCodeMax, "This class can only scan up to ScanCodeMax switches.");
+    static_assert(ROW_COUNT * COL_COUNT < ScanCodeMax - 1, "This class can only scan up to ScanCodeMax - 1 switches.");
     static_assert(ROW_COUNT > 0, "ROW_COUNT cannot be 0");
     static_assert(COL_COUNT > 0, "COL_COUNT cannot be 0");
+    static_assert(EVENT_BUFFER_SIZE > 0, "EVENT_BUFFER_SIZE cannot be 0");
 
     // +----------------------------------------------------------------------+
     // | HELPERS
     // +----------------------------------------------------------------------+
+    void flush_opened_events()
+    {
+        if(m_scancode_event_buffer_opened_len > 0)
+        {
+            onSwitchOpen(m_scancode_event_buffer_opened, m_scancode_event_buffer_opened_len);
+            m_scancode_event_buffer_opened_len = 0;
+        }
+    }
+
+    void flush_closed_events()
+    {
+        if(m_scancode_event_buffer_closed_len > 0)
+        {
+            onSwitchClosed(m_scancode_event_buffer_closed, m_scancode_event_buffer_closed_len);
+            m_scancode_event_buffer_closed_len = 0;
+        }
+    }
+
+
     static constexpr bool is_closed(const uint8_t sample_mask, const uint8_t sample_buffer)
     {
         return (sample_mask & sample_buffer) == sample_mask;
@@ -261,42 +270,40 @@ private:
         if (is_closed(DebounceSampleMask, swtch.sample_buffer) && swtch.state != SwitchState::CLOSED)
         {
             const SwitchState oldState = swtch.state;
-            swtch.state                = SwitchState::CLOSED_EVENT_PENDING;
+            swtch.state                = SwitchState::CLOSED;
+            m_scancode_event_buffer_closed[m_scancode_event_buffer_closed_len++] = swtch.scancode;
             reset_sample_count(swtch);
             pending_event = true;
         }
         else if (is_open(DebounceSampleMask, swtch.sample_buffer) && swtch.state != SwitchState::OPEN)
         {
             const SwitchState oldState = swtch.state;
+            swtch.state   = SwitchState::OPEN;
             if (oldState == SwitchState::UNKNOWN)
             {
-                swtch.state   = SwitchState::OPEN_EVENT_PENDING;
+                m_scancode_event_buffer_opened[m_scancode_event_buffer_opened_len++] = swtch.scancode;
                 pending_event = true;
-            }
-            else
-            {
-                swtch.state = SwitchState::OPEN;
             }
             reset_sample_count(swtch);
         }
         return pending_event;
     }
 
-    void onSwitchClosed(const SwitchDef& swtch)
+    void onSwitchClosed(const uint16_t (&scancodes)[EVENT_BUFFER_SIZE], size_t scancodes_len)
     {
         const SwitchHandler switchhandler_closed = m_switchhandler_closed;
         if (switchhandler_closed != nullptr)
         {
-            switchhandler_closed(swtch.scancode);
+            switchhandler_closed(scancodes, scancodes_len);
         }
     }
 
-    void onSwitchOpen(const SwitchDef& swtch)
+    void onSwitchOpen(const uint16_t (&scancodes)[EVENT_BUFFER_SIZE], size_t scancodes_len)
     {
         const SwitchHandler switchhandler_open = m_switchhandler_open;
         if (switchhandler_open != nullptr)
         {
-            switchhandler_open(swtch.scancode);
+            switchhandler_open(scancodes, scancodes_len);
         }
     }
 
@@ -307,7 +314,10 @@ private:
     SwitchHandler m_switchhandler_open;
     const uint8_t m_column_input_type;
     const bool    m_enable_software_debounce;
-    uint8_t       m_event_high_water_mark[2];
+    uint16_t      m_scancode_event_buffer_opened[EVENT_BUFFER_SIZE];
+    size_t        m_scancode_event_buffer_opened_len;
+    uint16_t      m_scancode_event_buffer_closed[EVENT_BUFFER_SIZE];
+    size_t        m_scancode_event_buffer_closed_len;
 };
 
 };  // namespace thirtytwobits
