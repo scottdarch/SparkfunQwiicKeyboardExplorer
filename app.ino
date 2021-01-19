@@ -7,17 +7,20 @@
 #include <Adafruit_SPITFT.h>
 #include <gfxfont.h>
 
-#include "src/KeyboardReader.h"
+#include "src/SwitchMatrixScanner.h"
 #include <Adafruit_SSD1306.h>
+#include <SparkFun_Qwiic_Twist_Arduino_Library.h>
+#include <SparkFunSX1509.h>
 
 #define SCREEN_WIDTH 128  // OLED display width, in pixels
 #define SCREEN_HEIGHT 32  // OLED display height, in pixels
 
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+TWIST            twist;  // Create instance of this object
 
 char keymap[] = {'1', '2', '3', '4', '5', '6', '7', 'a', 'b', 'c', 'd', 'e', 'f', 'g'};
-io::thirtytwobits::KeyboardReader<2, 7> kbread({A0, A1}, {A2, 4, 5, 6, 7, 8, 9}, true, true);
+io::thirtytwobits::SwitchMatrixScanner<2, 7> kbread({A0, A1}, {A2, 4, 5, 6, 7, 8, 9}, true, true);
 
 namespace
 {
@@ -65,7 +68,6 @@ void onKeyDown(uint16_t scancode)
     {
         p = 0;
     }
-    kbread.isKeyDown(scancode);
     writeToDisplay(line_buffer);
 }
 
@@ -78,7 +80,7 @@ void setup()
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
     {  // Address 0x3C for 128x32
         Serial1.println(F("SSD1306 allocation failed"));
-        for (;;)
+        while (1)
             ;  // Don't proceed, loop forever
     }
     Serial.println(F("OK"));
