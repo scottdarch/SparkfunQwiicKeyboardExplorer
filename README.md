@@ -1,8 +1,6 @@
 # SparkfunQwiicKeyboardExplorer
+
 Arduino sketch to run my Sparkfun QWIIC Keyboard Explorer build.
 
-## KeyboardReader.h
-
-The KeyboardReader 
-
-![Assumed Keyboard Matrix Schematic](schematic.png)
+See [SwitchMatrixScanner](https://github.com/thirtytwobits/SwitchMatrixScanner) for the
+Arduino library I wrote for this project.
