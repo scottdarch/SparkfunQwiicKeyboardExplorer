@@ -1,7 +1,10 @@
 {
-    "sketch": "app.ino",
+    "sketch": "SparkfunQwiicKeyboardExplorer.ino",
     "board": "SparkFun:avr:promicro",
     "configuration": "cpu=16MHzatmega32U4",
-    "port": "/dev/tty.usbmodem14101",
-    "output": "build"
+    "port": "/dev/tty.usbmodemHIDPC1",
+    "output": "build",
+    "buildPreferences": [
+        ["build.extra_flags", "-I${workspaceFolder}"]
+    ]
 }
