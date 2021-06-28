@@ -13,7 +13,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "io/thirtytwobits/hotkeys/board.h"
+#include "board.h"
 
 namespace io
 {
@@ -23,8 +23,8 @@ namespace hotkeys
 {
 template <typename IODriverClass,
           typename PageDisplayType = board::PageDisplayType,
-          size_t ScreenWidth = board::PageDisplayWidth,
-          size_t ScreenHeight = board::PageDisplayHeight>
+          size_t ScreenWidth = board::PageScreenWidth,
+          size_t ScreenHeight = board::PageScreenHeight>
 class PageScreen final
 {
     PageScreen(IODriverClass& ioDriver)
