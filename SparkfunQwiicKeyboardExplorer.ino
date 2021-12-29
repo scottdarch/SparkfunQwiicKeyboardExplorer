@@ -1,5 +1,3 @@
-#include <SparkFunSX1509.h>
-
 /*
  *                                                              [h][o][t][ ]
  *                                                              [k][e][y][s]
@@ -29,7 +27,7 @@ using namespace io::thirtytwobits;
 
 namespace
 {
-using PageScreenT = hotkeys::PageScreen<typeof(Wire)>;
+using PageScreenT = hotkeys::PageScreen<4, 2, typeof(Wire)>;
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 template <>
 PageScreenT            PageScreenT::singleton{Wire};
@@ -43,8 +41,10 @@ bool  hid_mode_init = false;
 char keymap[] = {'1', '2', '3', '4', '5', '6', '7', 'a', 'b', 'c', 'd', 'e', 'f', 'g'};
 char display_string[hotkeys::board::KeyMatrixRowCount][hotkeys::board::KeyMatrixColumnCount + 3] =
     {{'_', '_', '_', '_', '_', '_', '_', ' ', ' ', 0}, {'_', '_', '_', '_', '_', '_', '_', ' ', ' ', 0}};
-int keylights[hotkeys::board::KeyMatrixRowCount][hotkeys::board::KeyMatrixColumnCount] = {{0, 1, 2, 3, 4, 5, 6},
-                                                                                          {7, 8, 9, 10, 11, 12, 13}};
+int keylights[hotkeys::board::KeyMatrixRowCount][hotkeys::board::KeyMatrixColumnCount] = {
+                                                                                            {7, 8, 9, 10, 11, 12, 13}
+                                                                                           ,{0, 1, 2, 3, 4, 5, 6}
+                                                                                         };
 gh::thirtytwobits::SwitchMatrixScanner<hotkeys::board::KeyMatrixRowCount, hotkeys::board::KeyMatrixColumnCount> kbread(
     {A0, A1},
     {A2, 4, 5, 6, 7, 8, 9},
@@ -59,15 +59,12 @@ void writeDisplayString(bool clearAndDisplay = true)
     {
         page_screen.clearDisplay();
     }
-    // display.setTextSize(1);               // Normal 1:1 pixel scale
-    // display.setTextColor(SSD1306_WHITE);  // Draw white text
-    // display.setCursor(0, 0);              // Start at top-left corner
-    // display.println(display_string[0]);
-    // display.print(display_string[1]);
-    // if (clearAndDisplay)
-    // {
-    //     display.display();
-    // }
+    page_screen.println(0, 0, display_string[0]);
+    page_screen.println(0, 1, display_string[1]);
+    if (clearAndDisplay)
+    {
+        page_screen.display();
+    }
 }
 
 void onKeyUp(const uint16_t (&scancodes)[decltype(kbread)::event_buffer_size], size_t scancodes_len)
@@ -80,7 +77,7 @@ void onKeyUp(const uint16_t (&scancodes)[decltype(kbread)::event_buffer_size], s
         dirty                                                            = true;
         int keylight = keylights[scanindex / hotkeys::board::KeyMatrixColumnCount]
                                 [scanindex % hotkeys::board::KeyMatrixColumnCount];
-        ioexpander.digitalWrite(keylight, LOW);
+        ioexpander.digitalWrite(keylight, HIGH);
         if (HOTKEYS_HID)
         {
             Keyboard.release(keymap[scanindex]);
@@ -98,7 +95,7 @@ void onKeyDown(const uint16_t (&scancodes)[decltype(kbread)::event_buffer_size],
         dirty                                                            = true;
         int keylight = keylights[scanindex / hotkeys::board::KeyMatrixColumnCount]
                                 [scanindex % hotkeys::board::KeyMatrixColumnCount];
-        ioexpander.digitalWrite(keylight, HIGH);
+        ioexpander.digitalWrite(keylight, LOW);
         if (HOTKEYS_HID)
         {
             Keyboard.press(keymap[scanindex]);
@@ -162,6 +159,10 @@ void setup()
         Serial.println(F("QWIIC twist allocation failed"));
         display_string[1][hotkeys::board::KeyMatrixColumnCount + 1] = 'e';
     }
+    twist.setLimit(PageScreenT::PageCount);
+    twist.connectColor(0, 0, 0);
+    twist.setColor(0xFF, 0, 0);
+
     if (!ioexpander.begin(0x3E))
     {
         Serial.println(F("QWIIC SX1509 allocation failed"));
@@ -171,21 +172,29 @@ void setup()
         // hotkeys::KeyMatrixRowCount][hotkeys::KeyMatrixColumnCount
         for (size_t row = 0; row < hotkeys::board::KeyMatrixRowCount; ++row)
         {
-            const size_t offset = hotkeys::board::KeyMatrixRowCount * row;
             for (size_t col = 0; col < hotkeys::board::KeyMatrixColumnCount; ++col)
             {
-                ioexpander.pinMode(offset + col, OUTPUT);
+                ioexpander.pinMode(keylights[row][col], OUTPUT);
             }
         }
     }
     pinMode(A3, INPUT_PULLUP);  // initialize mode switch pin
-    twist.connectBlue(-10);
     Serial.println(F("OK"));
 }
+
+unsigned schedule = 0;
 
 void loop()
 {
     kbread.scan();
+    if(schedule % 2 == 0)
+    {
+        if(page_screen.setPage(twist.getCount()))
+        {
+            dirty = true;
+        }
+    }
+    schedule += 1;
     checkMode();
     kbread.scan();
     if (dirty)

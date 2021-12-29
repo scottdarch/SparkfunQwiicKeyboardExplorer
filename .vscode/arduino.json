@@ -2,6 +2,6 @@
     "sketch": "SparkfunQwiicKeyboardExplorer.ino",
     "board": "SparkFun:avr:promicro",
     "configuration": "cpu=16MHzatmega32U4",
-    "port": "/dev/tty.usbmodemHIDPC1",
+    "port": "/dev/cu.usbmodemHIDPC1",
     "output": "build"
 }
