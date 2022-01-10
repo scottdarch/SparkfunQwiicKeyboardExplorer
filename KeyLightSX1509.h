@@ -25,7 +25,6 @@
 #ifndef IO_THIRTYTWOBITS_KEYLIGHT_SX1509_H
 #define IO_THIRTYTWOBITS_KEYLIGHT_SX1509_H
 
-#include "KeyPad.h"
 #include <SparkFunSX1509.h>
 
 namespace io
@@ -45,39 +44,41 @@ namespace thirtytwobits
 /**
  * Implementation of a KeyPad::KeyLight interface using the SX1509 IO expander.
  */
-template<int SSX1509Pin>
-class KeyLightSX1509 : public KeyLight
+class KeyLightSX1509 final
 {
 public:
-    KeyLightSX1509(SX1509& expander)
-        : pin(SSX1509Pin)
-        , m_expander(expander)
+    KeyLightSX1509(SX1509& expander, int pin)
+        : m_expander(expander)
+        , m_pin(pin)
     {}
 
-    virtual bool setup() override
+    bool setup()
     {
-        m_expander.pinMode(SSX1509Pin, OUTPUT);
-        m_expander.ledDriverInit(SSX1509Pin);
+        m_expander.pinMode(m_pin, OUTPUT);
+        m_expander.ledDriverInit(m_pin);
+        return true;
     }
 
-    virtual bool digitalWrite(byte level) override
+    bool digitalWrite(byte level)
     {
-        m_expander.digitalWrite(SSX1509Pin, level);
+        m_expander.digitalWrite(m_pin, level);
         return true;
     }
-    virtual bool analogWrite(byte level) override
+
+    bool analogWrite(byte level)
     {
-        m_expander.analogWrite(SSX1509Pin, level);
+        m_expander.analogWrite(m_pin, level);
         return true;
     }
-    virtual bool breathe(byte level) override
+
+    bool breathe(byte level)
     {
         return false;
     }
 
-    const int pin;
 private:
     SX1509& m_expander;
+    const int m_pin;
 };
 
 } // namespace thirtytwobits
