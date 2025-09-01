@@ -44,23 +44,25 @@ char display_string[hotkeys::board::KeyMatrixRowCount * display_columns] =
     {'_', '_', '_', '_', '_', '_', '_', ' ', ' ', 0, '_', '_', '_', '_', '_', '_', '_', ' ', ' ', 0};
 
 /*
-   PWM  PWM  PWM  PWM  PWM  PWM  PWM
-   BLK  BLK  BLK  BLK  BLK  BLK  BLK
-    -    -    -   BRE  BRE  BRE  BRE
+   All pins support PWM and blink.
+   Only pins with BRE support breathing.
+   
+   BRE  BRE  BRE  BRE  BRE  BRE  BRE
   +---++---++---++---++---++---++---+
-  | 8 || 9 || 10|| 12|| 13|| 14|| 15|
+  | 5 || 6 || 7 || 12|| 13|| 14|| 15|
   +---++---++---++---++---++---++---+
+    -    -    -    -   BRE   -    -
   +---++---++---++---++---++---++---+
-  | 0 || 1 || 2 || 4 || 5 || 6 || 7 |
+  | 0 || 1 || 2 || 3 || 4 || 8 || 9 |
   +---++---++---++---++---++---++---+
 */
 SX1509 ioexpander;
 
 io::thirtytwobits::KeyLightSX1509 keylights[hotkeys::board::KeyMatrixRowCount * hotkeys::board::KeyMatrixColumnCount] =
 { 
-          io::thirtytwobits::KeyLightSX1509(ioexpander, 8)
-        , io::thirtytwobits::KeyLightSX1509(ioexpander, 9)
-        , io::thirtytwobits::KeyLightSX1509(ioexpander, 10)
+          io::thirtytwobits::KeyLightSX1509(ioexpander, 5)
+        , io::thirtytwobits::KeyLightSX1509(ioexpander, 6)
+        , io::thirtytwobits::KeyLightSX1509(ioexpander, 7)
         , io::thirtytwobits::KeyLightSX1509(ioexpander, 12)
         , io::thirtytwobits::KeyLightSX1509(ioexpander, 13)
         , io::thirtytwobits::KeyLightSX1509(ioexpander, 14)
@@ -68,10 +70,10 @@ io::thirtytwobits::KeyLightSX1509 keylights[hotkeys::board::KeyMatrixRowCount * 
         , io::thirtytwobits::KeyLightSX1509(ioexpander, 0)
         , io::thirtytwobits::KeyLightSX1509(ioexpander, 1)
         , io::thirtytwobits::KeyLightSX1509(ioexpander, 2)
+        , io::thirtytwobits::KeyLightSX1509(ioexpander, 3)
         , io::thirtytwobits::KeyLightSX1509(ioexpander, 4)
-        , io::thirtytwobits::KeyLightSX1509(ioexpander, 5)
-        , io::thirtytwobits::KeyLightSX1509(ioexpander, 6)
-        , io::thirtytwobits::KeyLightSX1509(ioexpander, 7)
+        , io::thirtytwobits::KeyLightSX1509(ioexpander, 8)
+        , io::thirtytwobits::KeyLightSX1509(ioexpander, 9)
 };
 
 using KeyPadType = io::thirtytwobits::KeyPad<io::thirtytwobits::KeyLightSX1509,
